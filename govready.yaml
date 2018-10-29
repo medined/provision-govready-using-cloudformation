@@ -1,0 +1,77 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: GovReady
+
+Parameters:
+  rKeyname:
+    Type: String
+    Default: ciaj-dev
+  rVPC:
+    Type: String
+    Default: vpc-090ab1c7c1b8f1758
+  rSubnet:
+    Type: String
+    Default: subnet-01e85a58969d42e59
+  rAMI:
+    Type: String
+    Default: ami-0ff8a91507f77f867
+  rInstanceSize:
+    Type: String
+    Default: t2.medium
+
+Resources:
+  rIncomingSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "Allow access to GovReady by everyone."
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 8000
+          ToPort: 8000
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Join [ ":", [ !Ref "AWS::StackName", sg-incoming-govready ] ]
+      VpcId: !Ref rVPC
+
+  rEC2:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref rAMI
+      InstanceType: !Ref rInstanceSize
+      KeyName: !Ref rKeyname
+      Tags:
+      - Key: Name
+        Value: govready
+      NetworkInterfaces:
+      - AssociatePublicIpAddress: true
+        DeviceIndex: "0"
+        GroupSet:
+          - !Ref rIncomingSecurityGroup
+        SubnetId: !Ref rSubnet
+      UserData:
+        'Fn::Base64': !Sub |
+          #!/bin/bash -ex
+          yum update -y
+          yum install -y docker
+          service docker start
+          usermod -a -G docker ec2-user
+          PUBLIC_IP=$(curl --silent http://169.254.169.254/latest/meta-data/public-ipv4)
+          wget --quiet https://raw.githubusercontent.com/GovReady/govready-q/master/deployment/docker/docker_container_run.sh
+          chmod +x docker_container_run.sh
+          sudo -H -u ec2-user bash -c './docker_container_run.sh --bind $PUBLIC_IP:8000'
+          touch /userdata.complete
+Outputs:
+  InstanceId:
+    Description: InstanceId of the newly created EC2 instance
+    Value: !Ref rEC2
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", InstanceId ] ]
+  PublicIP:
+    Description: Public IP address of the newly created EC2 instance
+    Value: !GetAtt rEC2.PublicIp
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", PublicIp ] ]

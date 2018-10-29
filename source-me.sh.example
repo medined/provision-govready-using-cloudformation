@@ -1,0 +1,14 @@
+#!/bin/sh
+
+# A namespace has been added to the environment variables so they
+# are listed together when sorted. It also reduced the likelihood
+# of name collision with other utility.
+
+###########
+# WARNING!
+###########
+# Please do not use a dollar sign in the password variable. This
+# project uses shell commands and they are not properly escaped
+# so the dollar sign will break the process!
+
+Z97_PEM_FILE=/.../xxxyyy.pem
